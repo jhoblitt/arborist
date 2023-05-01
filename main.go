@@ -35,6 +35,7 @@ type GHBranch struct {
 	Name     string
 	AheadBy  int
 	BehindBy int
+	Repo     *GHRepo
 }
 
 func NewGHRepo(ctx context.Context, client *github.Client, org, name string) GHRepo {
@@ -69,7 +70,8 @@ func NewGHRepo(ctx context.Context, client *github.Client, org, name string) GHR
 		r.Branches[branch_name] = GHBranch{
 			Name:     branch_name,
 			AheadBy:  compare.GetAheadBy(),
-			BehindBy: compare.GetAheadBy(),
+			BehindBy: compare.GetBehindBy(),
+			Repo:     &r,
 		}
 	}
 
@@ -138,29 +140,28 @@ func main() {
 		project_repos = append(project_repos, NewGHRepo(ctx, client, r.OrgName, r.RepoName))
 	}
 
-	safe_branches := map[string]GHRepo{}
+	safe_branches := map[string]GHBranch{}
+	prune_branches := map[string][]GHBranch{}
 
 	for i, r := range project_repos {
 		other_repos := RemoveIndex(project_repos, i)
 
 	BRANCH:
 		for _, b := range r.Branches {
-			fmt.Printf("%s/%s:", r.Org, r.Name)
-			fmt.Println(b.Name, "--", "ahead by:", b.AheadBy, "behind by", b.BehindBy)
+			fmt.Printf("%s/%s:%s -- ahead: %d, behind: %d\n", r.Org, r.Name, b.Name, b.AheadBy, b.BehindBy)
 
 			// Check to see if this branch is already known to be ahead.
-			safer, ok := safe_branches[b.Name]
+			safeb, ok := safe_branches[b.Name]
 			if ok {
-				fmt.Println("ignoring branch:", b.Name, "because it is known to be ahead in", safer.FullName())
+				fmt.Println("ignoring branch:", b.Name, "because it is known to be ahead in", safeb.Repo.FullName())
 				continue BRANCH
 			}
 
-			// if this branch is ahead of the default branch, we want to preserve it
-			// across all repos, even if it not ahead of the default branch in other
-			// repo(s).
+			// If this branch is ahead of the default branch, preserve it across all
+			// repos, even if it not ahead of the default branch in other repo(s).
 			if b.AheadBy != 0 {
 				fmt.Println("ignoring branch:", b.Name, "because it is ahead")
-				safe_branches[b.Name] = r
+				safe_branches[b.Name] = b
 				continue BRANCH
 			}
 
@@ -171,27 +172,43 @@ func main() {
 					log.Fatal(err)
 				}
 				if match == true {
-					// This branch isn't being added to safe_branches so we can report if
-					// a branch is ignored because it is ahead in a different repo or it
-					// has matched an exclude_pattern.
+					// This branch isn't being added to safe_branches so it can be
+					// reported if a branch is ignored because it is ahead in a different
+					// repo or it has matched an exclude_pattern.
 					fmt.Println("ignoring branch:", b.Name, "because it matched exclude_pattern:", pattern)
 					continue BRANCH
 				}
 			}
 
-			// Check for this branch in other repos. If any repo has this branch
-			// ahead of the default branch, then this branch name is considered safe
-			// across all repos and there's no need to keep checking any additional
-			// repos.
+			// Find all instances of this branch in other repos.
+			var known_branches []GHBranch
 			for _, otherr := range other_repos {
 				otherb, ok := otherr.Branches[b.Name]
+				if ok {
+					known_branches = append(known_branches, otherb)
+				}
+			}
 
-				if ok && otherb.AheadBy != 0 {
-					fmt.Println("ignoring branch:", b.Name, "because it is ahead in", otherr.FullName())
-					safe_branches[b.Name] = r
+			// Check for this branch in other repos. If any repo has this branch
+			// ahead of the default branch, then this branch name is considered safe
+			// across all repos.
+			for _, otherb := range known_branches {
+				if otherb.AheadBy != 0 {
+					fmt.Println("ignoring branch:", b.Name, "because it is ahead in", otherb.Repo.FullName())
+					safe_branches[b.Name] = b
 					continue BRANCH
 				}
 			}
+
+			// All known_branches must be AheadBy == 0 and may be removed
+			prune_branches[b.Name] = append(known_branches, b)
+		}
+	}
+
+	fmt.Println("Branches to be pruned")
+	for _, p := range prune_branches {
+		for _, b := range p {
+			fmt.Printf("%s/%s:%s -- ahead: %d, behind: %d\n", b.Repo.Org, b.Repo.Name, b.Name, b.AheadBy, b.BehindBy)
 		}
 	}
 }
