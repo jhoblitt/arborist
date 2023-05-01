@@ -20,6 +20,19 @@ type ArboristConf struct {
 	ExcludePattern []string `yaml:"exclude_pattern"`
 }
 
+type GHRepo struct {
+	Org           string
+	Name          string
+	DefaultBranch string
+	Branches      []GHBranch
+}
+
+type GHBranch struct {
+	BranchName string
+	AheadBy    int
+	BehindBy   int
+}
+
 func gh_client(ctx context.Context, gh_token string) *github.Client {
 	ts := oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: gh_token},
@@ -48,6 +61,14 @@ func parse_conf_file() ArboristConf {
 	return conf
 }
 
+func get_default_branch(ctx context.Context, client *github.Client, repo GHRepo) string {
+	r, _, err := client.Repositories.Get(ctx, repo.Org, repo.Name)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return r.GetDefaultBranch()
+}
+
 func main() {
 	gh_token := os.Getenv("GITHUB_TOKEN")
 	if gh_token == "" {
@@ -55,38 +76,33 @@ func main() {
 	}
 
 	conf := parse_conf_file()
-
-	org_name := conf.OrgName
-	repo_name := conf.RepoName
+	repo := GHRepo{
+		Org:  conf.OrgName,
+		Name: conf.RepoName,
+	}
 
 	ctx := context.Background()
 	client := gh_client(ctx, gh_token)
+	repo.DefaultBranch = get_default_branch(ctx, client, repo)
+	fmt.Println("default branch is:", repo.DefaultBranch)
 
-	repo, _, err := client.Repositories.Get(ctx, org_name, repo_name)
-	if err != nil {
-		log.Fatal(err)
-	}
-	default_branch := repo.GetDefaultBranch()
-	fmt.Println("default branch is:", default_branch)
-
-	branches, _, err := client.Repositories.ListBranches(ctx, org_name, repo_name, nil)
+	branches, _, err := client.Repositories.ListBranches(ctx, repo.Org, repo.Name, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	var notta_branches []string
-
 BRANCH:
 	for _, b := range branches {
 		branch_name := *b.Name
 
 		// skip comparing the default branch against itself
-		if branch_name == default_branch {
+		if branch_name == repo.DefaultBranch {
 			continue
 		}
 
 		// compare branch against the default branch
-		compare, _, err := client.Repositories.CompareCommits(ctx, org_name, repo_name, default_branch, branch_name, nil)
+		compare, _, err := client.Repositories.CompareCommits(ctx, repo.Org, repo.Name, repo.DefaultBranch, branch_name, nil)
 		if err != nil {
 			log.Fatal(err)
 		}
