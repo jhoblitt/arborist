@@ -15,9 +15,13 @@ import (
 )
 
 type ArboristConf struct {
-	OrgName        string   `yaml:"org_name"`
-	RepoName       string   `yaml:"repo_name"`
-	ExcludePattern []string `yaml:"exclude_pattern"`
+	Repos           []RepoConf `yaml:"repos"`
+	ExcludePatterns []string   `yaml:"exclude_patterns"`
+}
+
+type RepoConf struct {
+	OrgName  string `yaml:"org_name"`
+	RepoName string `yaml:"repo_name"`
 }
 
 type GHRepo struct {
@@ -40,7 +44,7 @@ func NewGHRepo(ctx context.Context, client *github.Client, org, name string) GHR
 	}
 
 	repo.DefaultBranch = get_default_branch(ctx, client, repo)
-	fmt.Println("default branch is:", repo.DefaultBranch)
+	fmt.Printf("%s/%s default branch is: %s\n", repo.Org, repo.Name, repo.DefaultBranch)
 
 	branches, _, err := client.Repositories.ListBranches(ctx, repo.Org, repo.Name, nil)
 	if err != nil {
@@ -119,32 +123,38 @@ func main() {
 	conf := parse_conf_file()
 	ctx := context.Background()
 	client := gh_client(ctx, gh_token)
-	repo := NewGHRepo(ctx, client, conf.OrgName, conf.RepoName)
 
-	var notta_branches []string
-BRANCH:
-	for _, b := range repo.Branches {
-		fmt.Println(b.Name, "--", "ahead by:", b.AheadBy, "behind by", b.BehindBy)
-
-		exclude := conf.ExcludePattern
-		for _, pattern := range exclude {
-			match, err := regexp.MatchString(pattern, b.Name)
-			if err != nil {
-				log.Fatal(err)
-			}
-			if match == true {
-				fmt.Println("ignoring branch:", b.Name, "because it matched exclude_pattern:", pattern)
-				continue BRANCH
-			}
-		}
-
-		if b.AheadBy == 0 {
-			notta_branches = append(notta_branches, b.Name)
-		}
+	var project_repos []GHRepo
+	for _, r := range conf.Repos {
+		project_repos = append(project_repos, NewGHRepo(ctx, client, r.OrgName, r.RepoName))
 	}
 
-	fmt.Println("branches with are not ahead")
-	for _, b := range notta_branches {
-		fmt.Println(b)
+	for _, r := range project_repos {
+		var notta_branches []string
+	BRANCH:
+		for _, b := range r.Branches {
+			fmt.Println(b.Name, "--", "ahead by:", b.AheadBy, "behind by", b.BehindBy)
+
+			exclude := conf.ExcludePatterns
+			for _, pattern := range exclude {
+				match, err := regexp.MatchString(pattern, b.Name)
+				if err != nil {
+					log.Fatal(err)
+				}
+				if match == true {
+					fmt.Println("ignoring branch:", b.Name, "because it matched exclude_pattern:", pattern)
+					continue BRANCH
+				}
+			}
+
+			if b.AheadBy == 0 {
+				notta_branches = append(notta_branches, b.Name)
+			}
+		}
+
+		fmt.Println("branches with are not ahead")
+		for _, b := range notta_branches {
+			fmt.Println(b)
+		}
 	}
 }
