@@ -28,9 +28,50 @@ type GHRepo struct {
 }
 
 type GHBranch struct {
-	BranchName string
-	AheadBy    int
-	BehindBy   int
+	Name     string
+	AheadBy  int
+	BehindBy int
+}
+
+func NewGHRepo(ctx context.Context, client *github.Client, org, name string) GHRepo {
+	repo := GHRepo{
+		Org:  org,
+		Name: name,
+	}
+
+	repo.DefaultBranch = get_default_branch(ctx, client, repo)
+	fmt.Println("default branch is:", repo.DefaultBranch)
+
+	branches, _, err := client.Repositories.ListBranches(ctx, repo.Org, repo.Name, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var branch_info []GHBranch
+	for _, b := range branches {
+		branch_name := *b.Name
+
+		// skip comparing the default branch against itself
+		if branch_name == repo.DefaultBranch {
+			continue
+		}
+
+		// compare branch against the default branch
+		compare, _, err := client.Repositories.CompareCommits(ctx, repo.Org, repo.Name, repo.DefaultBranch, branch_name, nil)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		branch_info = append(branch_info, GHBranch{
+			Name:     branch_name,
+			AheadBy:  compare.GetAheadBy(),
+			BehindBy: compare.GetAheadBy(),
+		})
+	}
+
+	repo.Branches = branch_info
+
+	return repo
 }
 
 func gh_client(ctx context.Context, gh_token string) *github.Client {
@@ -76,53 +117,29 @@ func main() {
 	}
 
 	conf := parse_conf_file()
-	repo := GHRepo{
-		Org:  conf.OrgName,
-		Name: conf.RepoName,
-	}
-
 	ctx := context.Background()
 	client := gh_client(ctx, gh_token)
-	repo.DefaultBranch = get_default_branch(ctx, client, repo)
-	fmt.Println("default branch is:", repo.DefaultBranch)
-
-	branches, _, err := client.Repositories.ListBranches(ctx, repo.Org, repo.Name, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
+	repo := NewGHRepo(ctx, client, conf.OrgName, conf.RepoName)
 
 	var notta_branches []string
 BRANCH:
-	for _, b := range branches {
-		branch_name := *b.Name
-
-		// skip comparing the default branch against itself
-		if branch_name == repo.DefaultBranch {
-			continue
-		}
-
-		// compare branch against the default branch
-		compare, _, err := client.Repositories.CompareCommits(ctx, repo.Org, repo.Name, repo.DefaultBranch, branch_name, nil)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		fmt.Println(branch_name, "--", "ahead by:", compare.GetAheadBy(), "behind by", compare.GetBehindBy())
+	for _, b := range repo.Branches {
+		fmt.Println(b.Name, "--", "ahead by:", b.AheadBy, "behind by", b.BehindBy)
 
 		exclude := conf.ExcludePattern
 		for _, pattern := range exclude {
-			match, err := regexp.MatchString(pattern, branch_name)
+			match, err := regexp.MatchString(pattern, b.Name)
 			if err != nil {
 				log.Fatal(err)
 			}
 			if match == true {
-				fmt.Println("ignoring branch:", branch_name, "because it matched exclude_pattern:", pattern)
+				fmt.Println("ignoring branch:", b.Name, "because it matched exclude_pattern:", pattern)
 				continue BRANCH
 			}
 		}
 
-		if compare.GetAheadBy() == 0 {
-			notta_branches = append(notta_branches, branch_name)
+		if b.AheadBy == 0 {
+			notta_branches = append(notta_branches, b.Name)
 		}
 	}
 
