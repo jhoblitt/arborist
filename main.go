@@ -20,8 +20,8 @@ type ArboristConf struct {
 }
 
 type RepoConf struct {
-	OrgName  string `yaml:"org_name"`
-	RepoName string `yaml:"repo_name"`
+	Org  string `yaml:"org"`
+	Name string `yaml:"name"`
 }
 
 type GHRepo struct {
@@ -137,7 +137,7 @@ func main() {
 
 	var project_repos []GHRepo
 	for _, r := range conf.Repos {
-		project_repos = append(project_repos, NewGHRepo(ctx, client, r.OrgName, r.RepoName))
+		project_repos = append(project_repos, NewGHRepo(ctx, client, r.Org, r.Name))
 	}
 
 	safe_branches := map[string]GHBranch{}
