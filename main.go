@@ -17,6 +17,7 @@ import (
 type ArboristConf struct {
 	Repos           []RepoConf `yaml:"repos"`
 	ExcludePatterns []string   `yaml:"exclude_patterns"`
+	Noop            bool       `yaml:"noop"`
 }
 
 type RepoConf struct {
@@ -209,6 +210,13 @@ func main() {
 	for _, p := range prune_branches {
 		for _, b := range p {
 			fmt.Printf("%s/%s:%s -- ahead: %d, behind: %d\n", b.Repo.Org, b.Repo.Name, b.Name, b.AheadBy, b.BehindBy)
+			if conf.Noop == false {
+				fmt.Printf("deleting %s/%s:%s\n", b.Repo.Org, b.Repo.Name, b.Name)
+				_, err := client.Git.DeleteRef(ctx, b.Repo.Org, b.Repo.Name, fmt.Sprintf("heads/%s", b.Name))
+				if err != nil {
+					log.Fatal(err)
+				}
+			}
 		}
 	}
 }
