@@ -24,6 +24,7 @@ type ArboristConf struct {
 type RepoConf struct {
 	Org  string `yaml:"org"`
 	Name string `yaml:"name"`
+	Noop bool   `yaml:"noop"`
 }
 
 type GHRepo struct {
@@ -31,6 +32,7 @@ type GHRepo struct {
 	Name          string
 	DefaultBranch string
 	Branches      map[string]GHBranch
+	Noop          bool
 }
 
 type GHBranch struct {
@@ -40,11 +42,12 @@ type GHBranch struct {
 	Repo     *GHRepo
 }
 
-func NewGHRepo(ctx context.Context, client *github.Client, org, name string) GHRepo {
+func NewGHRepo(ctx context.Context, client *github.Client, org, name string, noop bool) GHRepo {
 	r := GHRepo{
 		Org:      org,
 		Name:     name,
 		Branches: make(map[string]GHBranch),
+		Noop:     noop,
 	}
 
 	r.DefaultBranch = get_default_branch(ctx, client, r)
@@ -142,7 +145,7 @@ func main() {
 
 	var project_repos []GHRepo
 	for _, r := range conf.Repos {
-		project_repos = append(project_repos, NewGHRepo(ctx, client, r.Org, r.Name))
+		project_repos = append(project_repos, NewGHRepo(ctx, client, r.Org, r.Name, r.Noop))
 	}
 
 	safe_branches := map[string]GHBranch{}
@@ -207,6 +210,23 @@ func main() {
 
 			// All known_branches must be AheadBy == 0 and may be removed
 			prune_branches[b.Name] = append(known_branches, b)
+		}
+	}
+
+	// filter out "to be pruned" branches from repo(s) with noop set
+	for n, p := range prune_branches {
+		for i, b := range p {
+			if b.Repo.Noop {
+				fmt.Printf("ignoring %s/%s:%s as the repo has noop=true\n", b.Repo.Org, b.Repo.Name, n)
+				prune_branches[n] = append(p[:i], p[i+1:]...)
+			}
+		}
+	}
+
+	// filter out "to be pruned" branch names which no longer have any repos associated
+	for n, p := range prune_branches {
+		if len(p) == 0 {
+			delete(prune_branches, n)
 		}
 	}
 
