@@ -206,7 +206,7 @@ func main() {
 		}
 	}
 
-	fmt.Println("Branches to be pruned")
+	fmt.Printf("Branches to be pruned: %d\n", len(prune_branches))
 	for _, p := range prune_branches {
 		for _, b := range p {
 			fmt.Printf("%s/%s:%s -- ahead: %d, behind: %d\n", b.Repo.Org, b.Repo.Name, b.Name, b.AheadBy, b.BehindBy)
