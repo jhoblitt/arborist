@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -96,8 +97,8 @@ func gh_client(ctx context.Context, gh_token string) *github.Client {
 	return github.NewClient(rateLimiter)
 }
 
-func parse_conf_file() ArboristConf {
-	raw_conf, err := ioutil.ReadFile("arborist.yaml")
+func parse_conf_file(conf_file string) ArboristConf {
+	raw_conf, err := ioutil.ReadFile(conf_file)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -132,7 +133,10 @@ func main() {
 		log.Fatal("GITHUB_TOKEN env var is not defined")
 	}
 
-	conf := parse_conf_file()
+	var conf_file string = *flag.String("conf", "arborist.yaml", "path to config file")
+	flag.Parse()
+
+	conf := parse_conf_file(conf_file)
 	ctx := context.Background()
 	client := gh_client(ctx, gh_token)
 
