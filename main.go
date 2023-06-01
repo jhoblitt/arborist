@@ -131,13 +131,18 @@ func RemoveIndex(s []GHRepo, index int) []GHRepo {
 }
 
 func main() {
-	gh_token := os.Getenv("GITHUB_TOKEN")
-	if gh_token == "" {
-		log.Fatal("GITHUB_TOKEN env var is not defined")
-	}
-
-	var conf_file string = *flag.String("conf", "arborist.yaml", "path to config file")
+	gh_token_flag := flag.String("github-token", "", "path to config file")
+	conf_file_flag := flag.String("conf", "arborist.yaml", "path to config file")
 	flag.Parse()
+	gh_token := *gh_token_flag
+	conf_file := *conf_file_flag
+
+	if gh_token == "" {
+		gh_token = os.Getenv("GITHUB_TOKEN")
+		if gh_token == "" {
+			log.Fatal("GITHUB_TOKEN env var is not defined")
+		}
+	}
 
 	conf := parse_conf_file(conf_file)
 	ctx := context.Background()
