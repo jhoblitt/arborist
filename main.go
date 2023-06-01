@@ -210,7 +210,12 @@ func main() {
 		}
 	}
 
-	fmt.Printf("Branches to be pruned: %d\n", len(prune_branches))
+	if conf.Noop == false {
+		fmt.Printf("Branches to be pruned: %d\n", len(prune_branches))
+	} else {
+		fmt.Printf("Branches that would be be pruned if noop=false: %d\n", len(prune_branches))
+	}
+
 	for _, p := range prune_branches {
 		for _, b := range p {
 			fmt.Printf("%s/%s:%s -- ahead: %d, behind: %d\n", b.Repo.Org, b.Repo.Name, b.Name, b.AheadBy, b.BehindBy)
