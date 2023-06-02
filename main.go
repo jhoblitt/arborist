@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"regexp"
+	"strings"
 
 	"github.com/gofri/go-github-ratelimit/github_ratelimit"
 	"github.com/google/go-github/v52/github"
@@ -22,8 +23,7 @@ type ArboristConf struct {
 }
 
 type RepoConf struct {
-	Org  string `yaml:"org"`
-	Name string `yaml:"name"`
+	Repo string `yaml:"repo"`
 	Noop bool   `yaml:"noop"`
 }
 
@@ -130,6 +130,11 @@ func RemoveIndex(s []GHRepo, index int) []GHRepo {
 	return append(ret, s[index+1:]...)
 }
 
+func split_gh_repo_name(repo string) (string, string) {
+	s := strings.Split(repo, "/")
+	return s[0], s[1]
+}
+
 func main() {
 	gh_token_flag := flag.String("github-token", "", "path to config file")
 	conf_file_flag := flag.String("conf", ".arborist.yaml", "path to config file")
@@ -150,7 +155,8 @@ func main() {
 
 	var project_repos []GHRepo
 	for _, r := range conf.Repos {
-		project_repos = append(project_repos, NewGHRepo(ctx, client, r.Org, r.Name, r.Noop))
+		org, name := split_gh_repo_name(r.Repo)
+		project_repos = append(project_repos, NewGHRepo(ctx, client, org, name, r.Noop))
 	}
 
 	safe_branches := map[string]GHBranch{}
