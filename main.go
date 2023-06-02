@@ -132,7 +132,7 @@ func RemoveIndex(s []GHRepo, index int) []GHRepo {
 
 func main() {
 	gh_token_flag := flag.String("github-token", "", "path to config file")
-	conf_file_flag := flag.String("conf", "arborist.yaml", "path to config file")
+	conf_file_flag := flag.String("conf", ".arborist.yaml", "path to config file")
 	flag.Parse()
 	gh_token := *gh_token_flag
 	conf_file := *conf_file_flag
