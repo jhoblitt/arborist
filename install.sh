@@ -9,4 +9,4 @@ case $(uname -m) in
   aarch64) goarch="arm64";;
 esac
 
-\curl -SSL "https://github.com/jhoblitt/arborist/releases/latest/download/arborist-${goos}-${goarch}.tar.gz" | tar zxvf -
+\curl -sSL "https://github.com/jhoblitt/arborist/releases/latest/download/arborist-${goos}-${goarch}.tar.gz" | tar zxvf -

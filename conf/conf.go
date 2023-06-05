@@ -1,7 +1,6 @@
 package conf
 
 import (
-	"fmt"
 	"io/ioutil"
 	"log"
 	"strings"
@@ -69,8 +68,6 @@ func Parse(conf_file string) ArboristConf {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	fmt.Println(conf)
 
 	return conf
 }
