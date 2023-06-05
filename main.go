@@ -4,28 +4,15 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"regexp"
-	"strings"
 
 	"github.com/gofri/go-github-ratelimit/github_ratelimit"
 	"github.com/google/go-github/v52/github"
+	"github.com/jhoblitt/arborist/conf"
 	"golang.org/x/oauth2"
-	"gopkg.in/yaml.v3"
 )
-
-type ArboristConf struct {
-	Repos           []RepoConf `yaml:"repos"`
-	ExcludePatterns []string   `yaml:"exclude_patterns"`
-	Noop            bool       `yaml:"noop"`
-}
-
-type RepoConf struct {
-	Repo string `yaml:"repo"`
-	Noop bool   `yaml:"noop"`
-}
 
 type GHRepo struct {
 	Org           string
@@ -42,12 +29,12 @@ type GHBranch struct {
 	Repo     *GHRepo
 }
 
-func NewGHRepo(ctx context.Context, client *github.Client, org, name string, noop bool) GHRepo {
+func NewGHRepo(ctx context.Context, client *github.Client, repo conf.RepoConf) GHRepo {
 	r := GHRepo{
-		Org:      org,
-		Name:     name,
+		Org:      repo.Org,
+		Name:     repo.Name,
 		Branches: make(map[string]GHBranch),
-		Noop:     noop,
+		Noop:     *repo.Noop,
 	}
 
 	r.DefaultBranch = get_default_branch(ctx, client, r)
@@ -100,21 +87,6 @@ func gh_client(ctx context.Context, gh_token string) *github.Client {
 	return github.NewClient(rateLimiter)
 }
 
-func parse_conf_file(conf_file string) ArboristConf {
-	raw_conf, err := ioutil.ReadFile(conf_file)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	var conf ArboristConf
-	err = yaml.Unmarshal(raw_conf, &conf)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return conf
-}
-
 func get_default_branch(ctx context.Context, client *github.Client, repo GHRepo) string {
 	r, _, err := client.Repositories.Get(ctx, repo.Org, repo.Name)
 	if err != nil {
@@ -128,11 +100,6 @@ func RemoveIndex(s []GHRepo, index int) []GHRepo {
 	ret := make([]GHRepo, 0)
 	ret = append(ret, s[:index]...)
 	return append(ret, s[index+1:]...)
-}
-
-func split_gh_repo_name(repo string) (string, string) {
-	s := strings.Split(repo, "/")
-	return s[0], s[1]
 }
 
 func main() {
@@ -149,14 +116,13 @@ func main() {
 		}
 	}
 
-	conf := parse_conf_file(conf_file)
+	c := conf.Parse(conf_file)
 	ctx := context.Background()
 	client := gh_client(ctx, gh_token)
 
 	var project_repos []GHRepo
-	for _, r := range conf.Repos {
-		org, name := split_gh_repo_name(r.Repo)
-		project_repos = append(project_repos, NewGHRepo(ctx, client, org, name, r.Noop))
+	for _, r := range c.Repos {
+		project_repos = append(project_repos, NewGHRepo(ctx, client, r))
 	}
 
 	safe_branches := map[string]GHBranch{}
@@ -184,7 +150,7 @@ func main() {
 				continue BRANCH
 			}
 
-			exclude := conf.ExcludePatterns
+			exclude := c.ExcludePatterns
 			for _, pattern := range exclude {
 				match, err := regexp.MatchString(pattern, b.Name)
 				if err != nil {
@@ -241,7 +207,7 @@ func main() {
 		}
 	}
 
-	if conf.Noop == false {
+	if *c.Noop == false {
 		fmt.Printf("Branches to be pruned: %d\n", len(prune_branches))
 	} else {
 		fmt.Printf("Branches that would be be pruned if noop=false: %d\n", len(prune_branches))
@@ -250,7 +216,7 @@ func main() {
 	for _, p := range prune_branches {
 		for _, b := range p {
 			fmt.Printf("%s/%s:%s -- ahead: %d, behind: %d\n", b.Repo.Org, b.Repo.Name, b.Name, b.AheadBy, b.BehindBy)
-			if conf.Noop == false {
+			if *c.Noop == false {
 				fmt.Printf("deleting %s/%s:%s\n", b.Repo.Org, b.Repo.Name, b.Name)
 				_, err := client.Git.DeleteRef(ctx, b.Repo.Org, b.Repo.Name, fmt.Sprintf("heads/%s", b.Name))
 				if err != nil {
