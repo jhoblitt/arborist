@@ -38,6 +38,40 @@ cd ~/bin
 $ GITHUB_TOKEN=<token> arborist
 ```
 
+### Complete Example
+
+```bash
+ ~/tmp/arborist-test $ cat .arborist.yaml
+---
+noop: false
+repos:
+  - repo: jhoblitt/arborist-test1
+    noop: false
+  - repo: jhoblitt/arborist-test2
+    noop: true
+exclude_patterns:
+  - main
+ ~/tmp/arborist-test $ export GITHUB_TOKEN=<...>
+ ~/tmp/arborist-test $ arborist
+jhoblitt/arborist-test1 default branch is: main
+jhoblitt/arborist-test2 default branch is: main
+jhoblitt/arborist-test1:bar -- ahead: 0, behind: 0
+jhoblitt/arborist-test1:baz -- ahead: 0, behind: 0
+jhoblitt/arborist-test1:foo -- ahead: 1, behind: 2
+ignoring branch: foo because it is ahead
+jhoblitt/arborist-test2:bar -- ahead: 0, behind: 0
+jhoblitt/arborist-test2:baz -- ahead: 0, behind: 0
+jhoblitt/arborist-test2:foo -- ahead: 0, behind: 0
+ignoring branch: foo because it is known to be ahead in jhoblitt/arborist-test1
+ignoring jhoblitt/arborist-test2:bar as the repo has noop=true
+ignoring jhoblitt/arborist-test2:baz as the repo has noop=true
+Branches to be pruned: 2
+jhoblitt/arborist-test1:bar -- ahead: 0, behind: 0
+deleting jhoblitt/arborist-test1:bar
+jhoblitt/arborist-test1:baz -- ahead: 0, behind: 0
+deleting jhoblitt/arborist-test1:baz
+```
+
 ### GitHub API Token
 
 `arborist` uses GitHub's API and requires an API token to function. This may be
