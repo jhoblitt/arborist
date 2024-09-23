@@ -40,9 +40,19 @@ func NewGHRepo(ctx context.Context, client *github.Client, repo conf.RepoConf) G
 	r.DefaultBranch = get_default_branch(ctx, client, r)
 	fmt.Printf("%s default branch is: %s\n", r.FullName(), r.DefaultBranch)
 
-	branches, _, err := client.Repositories.ListBranches(ctx, r.Org, r.Name, nil)
-	if err != nil {
-		log.Fatal(err)
+	opts := &github.BranchListOptions{ListOptions: github.ListOptions{PerPage: 100}}
+	var branches []*github.Branch
+
+	for {
+		branchesPage, resp, err := client.Repositories.ListBranches(ctx, r.Org, r.Name, opts)
+		if err != nil {
+			log.Fatal(err)
+		}
+		branches = append(branches, branchesPage...)
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.ListOptions.Page = resp.NextPage
 	}
 
 	for _, b := range branches {
