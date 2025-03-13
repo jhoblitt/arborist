@@ -1,4 +1,4 @@
-FROM golang:1.19-alpine as builder
+FROM golang:1.23-alpine as builder
 
 ARG BIN=arborist
 RUN apk --update --no-cache add \

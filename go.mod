@@ -1,6 +1,8 @@
 module github.com/jhoblitt/arborist
 
-go 1.19
+go 1.23.0
+
+toolchain go1.23.7
 
 require (
 	github.com/gofri/go-github-ratelimit v1.0.3
