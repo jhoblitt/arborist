@@ -1,8 +1,8 @@
 package conf
 
 import (
-	"io/ioutil"
 	"log"
+	"os"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -58,7 +58,7 @@ func (s *RepoConf) UnmarshalYAML(unmarshal func(interface{}) error) error {
 }
 
 func Parse(conf_file string) ArboristConf {
-	raw_conf, err := ioutil.ReadFile(conf_file)
+	raw_conf, err := os.ReadFile(conf_file)
 	if err != nil {
 		log.Fatal(err)
 	}
